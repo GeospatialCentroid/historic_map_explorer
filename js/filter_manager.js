@@ -667,7 +667,7 @@ class Filter_Manager {
                if ($.isArray(obj[a])){
                     // need to add all the array items into the catalog
                     for (var j = 0; j<obj[a].length;j++){
-                        this.add_to_catalog(a,obj[a][j].trim())
+                        this.add_to_catalog(a,(obj[a][j]|| "").trim())
                     }
                }else{
                     this.add_to_catalog(a,obj[a])
