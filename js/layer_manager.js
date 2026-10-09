@@ -328,7 +328,7 @@ class Layer_Manager {
         html+='</div>'
 
        if ($.inArray(item.type,this.table_types)>-1){
-           html +="<button type='button' class='btn btn-primary table_but' onclick='layer_manager.show_table_data(\""+section_id+"_"+item_id+"\")'><i class='bi bi-table'></i></button>"
+           html +="<button type='button' class='btn btn-primary right_but' onclick='layer_manager.show_table_data(\""+section_id+"_"+item_id+"\")'><i class='bi bi-table'></i></button>"
        }
 
 //
@@ -1329,7 +1329,11 @@ class Layer_Manager {
            if(typeof params['e'] == "undefined"){
               setTimeout(() => {
                 // layer_manager.map.fitBounds( section_manager.json_data[section_id].clustered_points.getBounds());
-                map_manager.map.fitBounds(layer_manager.outlineLayer.getBounds());  
+                // skip if auto zoom layer is enabled
+                if($('#toggle_auto_zoom_checkbox').prop('checked')!=true){
+                    map_manager.map.fitBounds(layer_manager.outlineLayer.getBounds());      
+                }
+                 
                 $(window).resize(run_resize)
 
                 }, 2000);

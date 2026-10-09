@@ -915,7 +915,7 @@ body.split-view #data_table_wrapper {
     width:5px;
 }
 
-.table_but{
+.right_but{
     position: absolute;
     top: 0;
     right: 0;
@@ -1887,4 +1887,20 @@ a[aria-disabled="true"] {
 .filter_list a{
     padding-left: 10px;
 
+}
+
+/* Invisible container floating over the map */
+#map-alert-container {
+    position: absolute;
+    top: 15px;
+    right: 15px; /* Change to "left: 50px" if you prefer top-left, avoiding the zoom controls */
+    z-index: 10000; /* Ensures it sits above Leaflet controls and map panes */
+    pointer-events: none; /* Allows clicks to pass through to the map if the container is empty */
+    max-width: 350px;
+}
+
+/* The actual alert box */
+#map-alert-container .alert {
+    pointer-events: auto; /* Re-enables clicking on the alert itself (e.g., the close button) */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2); /* Adds a floating drop-shadow */
 }

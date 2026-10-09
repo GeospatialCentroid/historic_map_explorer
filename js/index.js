@@ -22,7 +22,7 @@ var last_params={}
 var usp={};// the url params object to be populated
 var browser_control=false; //flag for auto selecting to prevent repeat cals
 var show_hidden_controls=true;
-
+const hash = window.location.hash;
 
 function setup_params(){
      usp = new URLSearchParams(window.location.search.substring(1).replaceAll("~", "'").replaceAll("+", " "))
@@ -47,6 +47,7 @@ function setup_params(){
          if (usp.get('t')!=null ){
             params['t'] =  usp.get('t')
         }
+        
         // debug mode
         if (usp.get('d')!=null){
            DEBUGMODE=true
@@ -135,6 +136,10 @@ function initialize_interface() {
 
     map_manager.init()
 
+    if (usp.get('a')!=null) {
+        // dynamically set auto zoom
+        $('#toggle_auto_zoom_checkbox').prop('checked', true);
+    }
 
      // allow for iiif viewing
      image_manager=new Image_Manager({})
@@ -162,6 +167,8 @@ function initialize_interface() {
     });
     section_manager.init();
 
+ 
+
 }
 function after_filters(){
     run_resize()
@@ -187,9 +194,9 @@ function after_filters(){
             var parts=params['p'].split("_")
             filter_manager.select_item(parts[0],parts[1])
         }
-
+            processHashPermalink()
         },1000)
-
+        
 }
 
 
@@ -231,6 +238,10 @@ function save_params(){
 
     if (filter_manager.sort_str){
         p +="&sort="+filter_manager.sort_str
+    }
+    
+    if ($('#toggle_auto_zoom_checkbox').prop('checked')== true){
+        p +="&a=1"
     }
 
     // retain debug mode
@@ -567,3 +578,118 @@ function toggleGaTracking() {
 }
 
 
+function copy_record_permalink(recordId) {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const permalink = `${baseUrl}#${recordId}`;
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(permalink).then(() => {
+            
+            // Show a success alert for 5 seconds
+            showMapAlert(
+                `<strong>Success!</strong> Permalink copied to clipboard.<br><small>${permalink}</small>`, 
+                'alert-success', 
+                5
+            );
+
+        }).catch(err => {
+            console.error("Failed to copy text: ", err);
+            // Show a danger alert for 10 seconds if it fails
+            showMapAlert('<strong>Error:</strong> Failed to copy the permalink.', 'alert-danger', 10);
+        });
+    } else {
+        // Fallback for non-secure contexts
+        const tempInput = document.createElement("input");
+        tempInput.value = permalink;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+        
+        // Show the alert for 5 seconds
+        showMapAlert('<strong>Success!</strong> Permalink copied to clipboard.', 'alert-success', 1500);
+    }
+}
+
+function processHashPermalink() {
+
+    // Check if a hash exists and contains more than just the '#' symbol
+    if (hash && hash.length > 1) {
+        const recordId = hash.substring(1); // Extracts "1_0" from "#1_0"
+        var parts= recordId.split("_")
+        console.log(parts)
+        // 1. Show the record details panel (Replaces p=1_0)
+        // Ensure this matches your actual method for opening the sidebar record
+        if (typeof filter_manager !== 'undefined') {
+            console.log("here")
+            // Note: You may need to trigger the click event on the specific list item 
+            // if your app doesn't have a direct 'show_item' method.
+            filter_manager.select_item(parts[0],parts[1]); 
+        }
+
+        // 2. Add the layer to the map (Replaces l=!((id:~1_0~)))
+        if (typeof layer_manager !== 'undefined') {
+            layer_manager.add_layer_toggle(parts[0],parts[1]);
+            
+            $('#toggle_auto_zoom_checkbox').prop('checked', true);
+        }
+    }
+}
+
+/**
+ * Shows a floating alert over the map.
+ * @param {string} message - The HTML or text message to display.
+ * @param {string} alertType - Bootstrap alert class (e.g., 'alert-primary', 'alert-success', 'alert-warning').
+ * @param {number} durationSeconds - Time in seconds before the alert fades out.
+ */
+function showMapAlert(message, alertType = 'alert-primary', durationSeconds = 30) {
+    // 1. Check if the container exists inside the map, build it if it doesn't
+    let $container =$('#map-alert-container');
+    if ($container.length === 0) {
+        $container =$('<div id="map-alert-container"></div>');
+        $('#map').append($container);
+        const containerNode = $container[0];
+
+        // Disable Leaflet event propagation on raw DOM element
+        L.DomEvent.disableClickPropagation(containerNode);
+        L.DomEvent.disableScrollPropagation(containerNode);
+    }
+
+    // 2. Build the alert HTML using the provided Bootstrap template
+    const alertHtml = `
+        <div class="alert ${alertType} alert-dismissible fade show" role="alert">
+            ${message}
+            <a href="javascript:void(0);" class="bi bi-x btn right_but" data-dismiss="alert" aria-label="Close"></a>
+        </div>
+    `;
+
+    const $alert =$(alertHtml);
+
+    // 3. Append the alert to the floating container
+    $container.append($alert);
+
+    $(document).on('click mousedown dblclick pointerdown', '.alert', function(e) {
+        e.stopPropagation();
+    });
+
+    $alert.find('.bi-x').on('click', function(e) {
+        e.preventDefault();
+        $alert.fadeOut(400, function() {
+            $(this).remove();
+        });
+    });
+
+    // 4. Auto-remove after the specified duration
+    if (durationSeconds > 0) {
+        setTimeout(() => {
+            // Check if Bootstrap's JS is loaded to use its native close animation
+            if ($.fn.alert) {
+                $alert.alert('close');
+            } else {
+                // Fallback to standard jQuery fade out if Bootstrap JS is missing
+                $alert.fadeOut(400, function() {$(this).remove();
+                });
+            }
+        }, durationSeconds * 1000);
+    }
+}

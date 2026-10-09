@@ -1167,7 +1167,7 @@ list_results(section_id = null) {
                  item_html+=this.get_add_button(section_id,item._id)
 
                  if ($.inArray(item.type,layer_manager.table_types)>-1){
-                        item_html +="<button type='button' class='btn btn-primary table_but' onclick='layer_manager.show_table_data(\""+section_id+"_"+item._id+"\")'><i class='bi bi-table'></i></button>"
+                        item_html +="<button type='button' class='btn btn-primary right_but' onclick='layer_manager.show_table_data(\""+section_id+"_"+item._id+"\")'><i class='bi bi-table'></i></button>"
                     }
                  // if the record has no children
                  if(item.child_ids.length==0 && item[section.download_col]!=''){
@@ -1227,7 +1227,6 @@ list_results(section_id = null) {
 
         var section=section_manager.get_section_details(section_id)
         var html=""
-
         html+='<div class="item_title">'+item[section.title_col]+"</div>";// add the title column
         html+='<div class="details-buttons">'+'<button type="button" class="btn btn-success" onclick="filter_manager.select_item('+section_id+',\''+item._id+'\');" >Details</button>'+"</div>";
         html+= '<ul class="list-group"' +'">'
@@ -1344,13 +1343,15 @@ list_results(section_id = null) {
     show_details(item,section,_elm){
         // @param match: a json object with details (including a page path to load 'path_col')
         //create html details to show
-        var html="";
+       
         var section_id = item.section_id;
         var item_id=item._id;
-
+        var record_id =section_id+"_"+item_id
 
         var thumb_url=item[section.image_col]
         var iiif_url = item["IIIF"];
+
+        var html='<button type="button" class="btn btn-primary right_but"  data-record-id="\''+record_id+'\'" title="Copy Permalink" onclick="copy_record_permalink(\''+record_id+'\')"><i class="bi bi-link"></i></button>'
         html+='<div class="item_title">'+item[section.title_col]+"</div>";// add the title column
         html+="<div class='details-buttons' >"+this.get_add_button(section_id,item_id)
         if(item.child_ids.length==0 && item[section.download_col] !=''){
