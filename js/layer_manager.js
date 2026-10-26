@@ -988,7 +988,7 @@ class Layer_Manager {
          });
 
          geo.on('mouseover', function (e) {
-              console.log("geo.on('mouseover'", e)
+            //  console.log("geo.on('mouseover'", e)
            filter_manager.show_highlight(0,e.target.options.pane);
         });
         geo.on('mouseout', function (e) {
