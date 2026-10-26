@@ -418,6 +418,8 @@ function window_resize_do() {
         $("#sidebar_toggle").css({ top: $("#map_wrapper").offset().top + 5 });
         $('#data_table').width(window_width)
         if (map_manager && map_manager.map) map_manager.map.scrollWheelZoom.disable();
+        // hide map settings
+        $("#map_settings").hide();
         
     }
     

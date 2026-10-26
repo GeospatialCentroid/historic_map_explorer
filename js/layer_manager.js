@@ -139,6 +139,10 @@ class Layer_Manager {
     var layer_id=_layer_id.replace("item_","")
     var layer =  this.get_layer_obj(layer_id)
 
+    if (layer) {
+        layer._hasZoomed = false; // Reset the zoom flag when removed
+    }
+
     console_log("remove_feature_layer",layer_id,layer)
     this.map.removeLayer(layer.layer_obj);
 
@@ -1037,23 +1041,27 @@ class Layer_Manager {
         return _feature["id"]
   }
   layer_load_complete(but_id){
-    //`item_${section_id}_${item_id}`;
-    console_log("layer_load_complete",but_id)
+    console_log("layer_load_complete", but_id);
     const $button = $("." + but_id + "_toggle");
 
     $button.html(LANG.RESULT.REMOVE);
     $button.removeClass("progress-bar-striped progress-bar-animated");
     $("." + but_id + "_zoom").show();
-    if ($('#toggle_auto_zoom_checkbox').is(':checked')){
+
+    // Retrieve the layer object using the but_id (e.g., section_id_item_id)
+    const layerId = but_id.replace("item_", "");
+    var layer = this.get_layer_obj(layerId);
+
+    // Check if auto-zoom is enabled, checkbox is checked, and we haven't zoomed yet for this layer
+    if ($('#toggle_auto_zoom_checkbox').is(':checked') && layer && !layer._hasZoomed) {
+        layer._hasZoomed = true; // Mark as zoomed so it won't repeat
         $("." + but_id + "_zoom").click();
     }
 
     $button.removeClass("btn-primary").addClass("btn-danger");
 
-    // update the maps ta
+    // update the map tab
     this.update_layer_count();
-    //console_log("Add download link")
-    //download_manager.add_downloadable_layers()
   }
 
 

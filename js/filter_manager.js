@@ -156,8 +156,8 @@ class Filter_Manager {
             var section_id=all_data[i]?.section_id
             if(typeof section_id !== 'undefined' && Number.isFinite(section_id)){
                 var section =section_manager.json_data[all_data[i]?.section_id]
-                var col=section?.year_start_col
-                let year = this.getYear(String(all_data[i][col][0]));
+                var col="_dates"//section?.year_start_col
+                let year = this.getYear(String(all_data[i][col]));
                 if(year){ 
                     dates.push(year)
                 }
@@ -197,7 +197,16 @@ class Filter_Manager {
                $("#filter_end_date").val(ui.values[1])
                filter_manager.delay_date_change(col)
 
+               var $checkbox = $("#filter_date_checkbox");
+               console.log("DATe change")
+                if ($checkbox.length > 0) {
+                    $checkbox.prop("checked", true);
+                    $checkbox.trigger('change');
+                }
+
          }
+
+         
         })
 
     }
@@ -301,6 +310,7 @@ class Filter_Manager {
             // add text to the search field
             $("#search").val(value)
         }
+       
         // remove the __ to get the true id
         var id = _id.replaceAll("__", " ");
         // set the filters value
@@ -319,6 +329,9 @@ class Filter_Manager {
                 } else {
                     text_val = value.join(", ");
                 }
+            }
+             if (_id =="_dates"){
+                _id = LANG.SEARCH.CHIP_DATE_LABEL
             }
         }
         this.show_filter_selection(_id.replaceAll(" ", "__"), _id + ": " + text_val);
@@ -459,123 +472,167 @@ class Filter_Manager {
         var end = section_id ? section_id + 1 : this.section_manager.json_data.length;
         if(section_id){
             //allow filtering results from a single section
-            start=section_id
-            end =section_id+1
+            start = section_id;
+            end = section_id + 1;
         }
-        for (var i = start; i < end; i++) {
-                let section_data = this.section_manager.json_data[i].all_data;
-                for (var j = 0; j < section_data.length; j++) {
-                // compare each to the filter set to create a subset
-                var meets_criteria=true; // a boolean to determine if the item should be included
+        
+        // Array to hold scored items when text search is active: { item: obj, score: number }
+        var scored_subset = [];
+        var text_search_active = false;
+        var search_term = "";
 
-                var obj=section_data[j];
+        for (var i = start; i < end; i++) {
+            let section = this.section_manager.json_data[i];
+            let section_data = section.all_data;
+            
+            for (var j = 0; j < section_data.length; j++) {
+                // compare each to the filter set to create a subset
+                var meets_criteria = true; // a boolean to determine if the item should be included
+                var item_search_score = 0;
+
+                var obj = section_data[j];
                 for (var a in this.filters){
-                    if (a==LANG.SEARCH.CHIP_SUBMIT_BUT_LABEL){
-                        // if search term not found in both title and sub title
-    //                    if(obj[this.title_col].indexOf(this.filters[a][0]) == - 1 &&  obj[this.sub_title_col].indexOf(this.filters[a][0])==-1){
-    //                        meets_criteria=false
-    //                    }
-                        // convert to string for search
-                        var obj_str = JSON.stringify(omitKeys(obj, ['resource_obj','Reference URL'])).toLowerCase();
-                        if(obj_str.indexOf(this.filters[a][0].toLowerCase() )==-1){
-                            meets_criteria=false
+                    if (a == LANG.SEARCH.CHIP_SUBMIT_BUT_LABEL) {
+                        text_search_active = true;
+                        var raw_search_term = this.filters[a][0].toLowerCase();
+                        
+                        // Normalize search term by stripping out literal quotes so "Un-Named Plat" becomes un-named plat
+                        var search_term = raw_search_term.replace(/["']/g, "").trim();
+
+                        // --- SCALABLE WEIGHT CONFIGURATION ---
+                        var field_weights = {};
+                        field_weights[section.title_col] = 1.0;       
+                        field_weights[section.description_col] = 0.5;  
+
+                        var matched_in_fields = false;
+
+                        // 1. Evaluate explicit field weights (normalize field values too)
+                        for (var col_key in field_weights) {
+                            if (col_key && obj[col_key]) {
+                                var raw_field_val = String(obj[col_key]).toLowerCase();
+                                var clean_field_val = raw_field_val.replace(/["']/g, "");
+                                
+                                if (clean_field_val.indexOf(search_term) !== -1) {
+                                    item_search_score += field_weights[col_key];
+                                    matched_in_fields = true;
+                                }
+                            }
                         }
 
+                        // 2. Evaluate remaining row data
+                        var raw_obj_str = JSON.stringify(omitKeys(obj, ['resource_obj', 'Reference URL'])).toLowerCase();
+                        var clean_obj_str = raw_obj_str.replace(/["']/g, ""); // Strip all quotes from the entire JSON blob
+                        if (clean_obj_str.indexOf(search_term) !== -1) {
+                            if (!matched_in_fields) {
+                                item_search_score += 0.25;
+                            }
+                        } else {
+                            if (item_search_score === 0) {
+                                meets_criteria = false;
+                            }
+                        }
                     }else if (a=='Bounds'){
-                         var bounds_col=this.section_manager.json_data[i].geojson_col
-                         if(obj?.[bounds_col]){
-                             try{
-                                  const geojson = obj[bounds_col];
-                                  const poly1 = turf.polygon(geojson.features[0].geometry.coordinates);
-                                  const b = layer_manager.map.getBounds()
-                                  const sw = b.getSouthWest();
-                                    const ne = b.getNorthEast();
-                                  const poly2 = turf.polygon([[
-                                  [sw.lng, sw.lat],  // southwest
+                        var bounds_col = section.geojson_col;
+                        if(obj?.[bounds_col]){
+                            try{
+                                const geojson = obj[bounds_col];
+                                const poly1 = turf.polygon(geojson.features[0].geometry.coordinates);
+                                const b = layer_manager.map.getBounds();
+                                const sw = b.getSouthWest();
+                                const ne = b.getNorthEast();
+                                const poly2 = turf.polygon([[
+                                    [sw.lng, sw.lat],  // southwest
                                     [sw.lng, ne.lat],  // northwest
                                     [ne.lng, ne.lat],  // northeast
                                     [ne.lng, sw.lat],  // southeast
                                     [sw.lng, sw.lat]   // back to southwest to close
-                                  ]])
+                                ]]);
 
-                              if (!turf.booleanIntersects(poly1, poly2)){
-                                meets_criteria=false
-                              }
-                             }catch(e){
+                            if (!turf.booleanIntersects(poly1, poly2)){
+                                meets_criteria = false;
+                            }
+                            }catch(e){
 
-                             }
+                            }
                         }else{
-                             // no coordinates
-                             meets_criteria=false
+                            // no coordinates
+                            meets_criteria = false;
                         }
-                     }else if (a=='Point'){
-                        var bounds_col=this.section_manager.json_data[i].geojson_col;
+                    }else if (a=='Point'){
+                        var bounds_col = section.geojson_col;
 
                         if(obj?.[bounds_col]){
-                         try{
+                        try{
                                 const geojson = obj[bounds_col];
                                 const poly = turf.polygon(geojson.features[0].geometry.coordinates);
 
                                 const b = this.filters[a][0].split(",");
-                                if (!turf.booleanPointInPolygon(turf.point([b[1],b[0]]),poly)){
-                                    meets_criteria=false;
+                                if (!turf.booleanPointInPolygon(turf.point([b[1], b[0]]), poly)){
+                                    meets_criteria = false;
                                 }
                             }catch(e){
-                                meets_criteria=false;
+                                meets_criteria = false;
                             }
                         }else{
-                            meets_criteria=false;
+                            meets_criteria = false;
                         }
-                    }else if (a!='p'){
+                   } else if (a!='p'){
                         if ($.isNumeric(this.filters[a][0])){
-                            //we are dealing with a numbers - check range
-                            if (obj[a]<this.filters[a][0] || obj[a]>this.filters[a][1]){
-                                 meets_criteria=false
+                            //we are dealing with numbers - check range
+                            if (obj[a] < this.filters[a][0] || obj[a] > this.filters[a][1]){
+                                meets_criteria = false;
                             }
                         }else{
-                            // match the elements
-                            // make and exception for searching through array values
-                             if ($.isArray(obj[a])){
-                                // loop over the filters array checking if its in the object attribute array
-                                for(var k=0;k<this.filters[a].length;k++){
-                                     if ($.inArray(this.filters[a][k],obj[a])==-1){
-                                        meets_criteria=false
-                                     }
+                            // match elements
+                            if ($.isArray(obj[a])){
+                                // loop over filters array checking if its in object attribute array
+                                for(var k = 0; k < this.filters[a].length; k++){
+                                    if ($.inArray(this.filters[a][k], obj[a]) == -1){
+                                        meets_criteria = false;
+                                    }
                                 }
-                             }else{
-                                if ($.inArray(obj[a],this.filters[a])==-1){
-                                    meets_criteria=false
+                            }else{
+                                if ($.inArray(obj[a], this.filters[a]) == -1){
+                                    meets_criteria = false;
                                 }
-                             }
+                            }
                         }
                     }
                 }
-                if (meets_criteria==true){
-                        subset.push(obj)
+                
+                if (meets_criteria == true){
+                    if (text_search_active) {
+                        scored_subset.push({ item: obj, score: item_search_score });
+                    } else {
+                        subset.push(obj);
+                    }
                 }
             }
         }
-        //this.populate_search(subset)
+
+        // If text search was performed, sort results by score descending (highest weighted first)
+        if (text_search_active) {
+            scored_subset.sort(function(a, b) {
+                return b.score - a.score;
+            });
+            subset = scored_subset.map(entry => entry.item);
+        }
 
         // be sure to set the filter_manager params for setting filters during menu regeneration
-
-        this.params=[this.filters]
-        console_log( "params were set",this.filters)
-          
-//        this.save_filter_params()
-//
-//        this.add_filter_watcher();
+        this.params = [this.filters];
+        console_log("params were set", this.filters);
+        
         // keep track of the subset for sorting
-         this.subset_data=subset
-         this.show_sorted_results(subset)
+        this.subset_data = subset;
+        this.show_sorted_results(subset);
 
-          section_manager.slide_position("results");
+        section_manager.slide_position("results");
 
-          if(Object.keys(this.filters).length>0){
-              $("#filter_reset").show();
-          }else{
-             $("#filter_reset").hide();
-          }
+        if(Object.keys(this.filters).length > 0){
+            $("#filter_reset").show();
+        }else{
+        $("#filter_reset").hide();
+        }
     }
     add_filter_watcher(){
         var $this=this;
@@ -1073,7 +1130,7 @@ list_results(section_id = null) {
          text = LANG.RESULT.VIEW
          var iiif_url = item["IIIF"];
          var func ="image_manager.show_image"
-         var title = item[section.title_col]
+         var title = item[section.title_col].replace(/"/g, '&quot;'); 
          var ref_url = item["Reference URL"]
          button_text = `<button type="button" class="btn ${_class} view_but" onclick="${func}(\`${iiif_url}\`, \`${title}\`, \`${ref_url}\`, \`${item_id}\`, \`${item.georeference || ''}\`)">${text}</button>`
         }
@@ -1256,8 +1313,10 @@ list_results(section_id = null) {
             html+="</div>";
             html+='<div class="item_thumb_container"><img class="item_thumb" src="'+thumb_url+'"></div>'
             if (child.type=="AllMaps" || (child.type=="image" &&  child.geojson!="")){
-                           html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+child[section.title_col]+'\',\''+child["Reference URL"]+'\',\''+child["id"]+'\',\''+child["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
- 
+
+                var safe_title = child[section.title_col].replace(/"/g, '&quot;');
+                html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+safe_title+'\',\''+child["Reference URL"]+'\',\''+child["id"]+'\',\''+child["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
+
             }
 
             html+="</li>";
@@ -1349,19 +1408,22 @@ list_results(section_id = null) {
         var record_id =section_id+"_"+item_id
 
         var thumb_url=item[section.image_col]
+        item[section.title_col]
         var iiif_url = item["IIIF"];
+        var safe_title = item[section.title_col].replace(/"/g, '&quot;');
 
-        var html='<button type="button" class="btn btn-primary right_but"  data-record-id="\''+record_id+'\'" title="Copy Permalink" onclick="copy_record_permalink(\''+record_id+'\')"><i class="bi bi-link"></i></button>'
+        var html=''
         html+='<div class="item_title">'+item[section.title_col]+"</div>";// add the title column
         html+="<div class='details-buttons' >"+this.get_add_button(section_id,item_id)
         if(item.child_ids.length==0 && item[section.download_col] !=''){
             html+='<button type="button" class="btn btn-primary" onclick="download_item(\''+item[section.download_col]+'\')">'+LANG.RESULT.DOWNLOAD+'</button>'
           }
+        html+='<button type="button" class="btn btn-primary"  data-record-id="\''+record_id+'\'" title="Copy Permalink" onclick="copy_record_permalink(\''+record_id+'\')"><i class="bi bi-link"></i></button>'
         html+="</div>"
         html+='<div class="item_thumb_container"><img class="item_thumb" src="'+thumb_url+'"></div>';
 
         if(item?.child_ids && item.child_ids.length==0 && item.type=="AllMaps"){
-            html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+item[section.title_col]+'\',\''+item["Reference URL"]+'\',\''+item_id+'\',\''+item["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
+            html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+safe_title+'\',\''+item["Reference URL"]+'\',\''+item_id+'\',\''+item["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
         }
         for (var i in item){
             if ($.inArray(i,section.show_cols)!=-1 || DEBUGMODE){

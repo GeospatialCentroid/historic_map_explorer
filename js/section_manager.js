@@ -97,6 +97,48 @@ class Section_Manager {
         }
 
     }
+    parse_date_to_year(dateStr, mode = 'start') {
+        if (!dateStr) return null;
+        
+        // Convert to string and clean up
+        const str = String(dateStr).trim();
+        if (str === "") return null;
+
+        // Case 1: Already a 4-digit year (e.g., "1940")
+        if (/^\d{4}$/.test(str)) {
+            return parseInt(str, 10);
+        }
+
+        // Case 2: Supports YYYY-MM or YYYY-MM-DD (e.g., "1940-05" or "1873-01-16")
+        // Checks if the string starts with 4 digits followed by a hyphen
+        const yearMonthMatch = str.match(/^(\d{4})-\d{1,2}/);
+        if (yearMonthMatch) {
+            const year = parseInt(yearMonthMatch[1], 10);
+            if (year > 1000 && year < 2100) return year;
+        }
+
+        // Case 3: Contains general hyphens or slashes, extract 4-digit or 2-digit years
+        const matches = str.match(/\d+/g);
+        if (!matches) return null;
+
+        // Look for a 4-digit year anywhere in the string
+        for (let part of matches) {
+            if (part.length === 4) {
+                const year = parseInt(part, 10);
+                if (year > 1000 && year < 2100) return year;
+            }
+        }
+
+        // Handle 2-digit years (e.g., "1/1/78" -> 1978 or 2078)
+        for (let part of matches) {
+            if (part.length === 2) {
+                const num = parseInt(part, 10);
+                return num > 30 ? 1900 + num : 2000 + num;
+            }
+        }
+
+        return null;
+    }
     setup_disclaimer(_data,_id){
         $('#disclaimer_heading').html(_data.name);
         $('#disclaimer_text').html(_data.disclaimer);
@@ -283,38 +325,34 @@ class Section_Manager {
         //takes one or more data files and joins them on a key
         //starting with the second dataset, look for the left_join_col,right_join_col
         //When matched, map all the parameters to the first dataset
-        if(section.data.length>0){
-        var start=0
-            if(transcription_mode){
-                start=1
-            }
-            for (var j=start;j<section.data.length;j++){
-                var data_to_join=section.data[j]
-                var type=data_to_join[1]
-                if(type=="geojson"){
-                    this.join_geojson(section.all_data,data_to_join.data,data_to_join[2],data_to_join[3],section["title_col"])
-                    this.update_geojson_properties(section.all_data,show_cols,separated_cols,section?.image_col,section?.color_col)
-                }else if(type=="csv"){
-                    section.all_data= this.convert_csv_to_geojson(section,section.all_data,section["title_col"])
 
-                 }
-                section.show_cols=section.show_cols.split(",").map(function(item) {
-                      return item.trim();
-                });
-                var filter_cols=section.filter_cols.split(",").map(function(item) {
-                      return item.trim();
-                 });
-                 if(transcription_mode){
-                   filter_cols.push("has_data")
+        for (var j=0;j<section.data.length;j++){
+            var data_to_join=section.data[j]
+            var type=data_to_join[1]
+            if(type=="geojson"){
+                this.join_geojson(section.all_data,data_to_join.data,data_to_join[2],data_to_join[3],section["title_col"])
+                this.update_geojson_properties(section.all_data,show_cols,separated_cols,section?.image_col,section?.color_col)
+            }else if(type=="csv"){
+                section.all_data= this.convert_csv_to_geojson(section,section.all_data,section["title_col"])
+
                 }
-                var separated_cols=section.separated_cols.split(",").map(function(item) {
-                      return item.trim();
-                 });
-                section.filter_cols=filter_cols
-                this.update_data(section.all_data,section.show_cols,separated_cols,section?.image_col,section?.color_col)
-                filter_manager.create_filter_values(section,section.all_data,filter_cols,section?.year_start_col,section?.year_end_col);
+            section.show_cols=section.show_cols.split(",").map(function(item) {
+                    return item.trim();
+            });
+            var filter_cols=section.filter_cols.split(",").map(function(item) {
+                    return item.trim();
+                });
+                if(transcription_mode){
+                filter_cols.push("has_data")
             }
-          }
+            var separated_cols=section.separated_cols.split(",").map(function(item) {
+                    return item.trim();
+                });
+            section.filter_cols=filter_cols
+            this.update_data(section.all_data,section.show_cols,separated_cols,section?.image_col,section?.color_col,section?.year_start_col)
+            filter_manager.create_filter_values(section,section.all_data,filter_cols,section?.year_start_col,section?.year_end_col);
+        
+        }
 
     }
     add_parent_id(obj,all_data,unique_id_col,_parent_id){
@@ -467,45 +505,58 @@ class Section_Manager {
         return temp_data
     }
 
-    update_data(all_data,show_cols,separated_cols,image_col,color_col){
+    update_data(all_data, show_cols, separated_cols, image_col, color_col, year_start_col){
         // update the data directly
-        for (var i=0;i<all_data.length;i++){
-            var properties={}
-                 for (var k=0;k<separated_cols.length;k++){
-                       // if there is a number clean it up
-                       if(all_data[i]?.[separated_cols[k]] ){
-                            if (all_data[i][separated_cols[k]]?.match(/\d/) == null){
-                                    all_data[i][separated_cols[k]] = all_data[i][separated_cols[k]]
-                                    .split(",")
-                                    .map(s => s.trim());
-                            }else{
-                                    // contentdm uses semicolon for date lists
-                                    all_data[i][separated_cols[k]] =  all_data[i][separated_cols[k]].split(";").map(function(item) {
-                                    return getValidNumber(item.trim());
-                                    });
-                            }
+        for (var i=0; i < all_data.length; i++){
+            var row = all_data[i];
+            var properties = {};
 
-                       }
-                       
-                 }
+            for (var k=0; k < separated_cols.length; k++){
+                // if there is a number clean it up
+                if(row?.[separated_cols[k]] ){
+                    if (row[separated_cols[k]]?.match(/\d/) == null){
+                        row[separated_cols[k]] = row[separated_cols[k]]
+                            .split(",")
+                            .map(s => s.trim());
+                    } else {
+                        // contentdm uses semicolon for date lists
+                        row[separated_cols[k]] = row[separated_cols[k]].split(";").map(function(item) {
+                            return getValidNumber(item.trim());
+                        });
+                    }
+                }
+            }
+            
             // and if there is an image col
             if(image_col){
-                //first split on ;
-                var images = properties[image_col]
-                var html_images =""
+                var images = properties[image_col];
+                var html_images = "";
                 for(var img in images){
-                   html_images+=String(images[img]).image_text()
+                   html_images += String(images[img]).image_text();
                 }
-                properties[image_col]=html_images
-               }
-             if(color_col){
-                properties['color']=all_data[i][color_col]
-             }
-// this is over writing the properties set earlier
-//            if(all_data[i]?.feature){
-//                all_data[i].feature.features[0].properties=properties
-//            }
+                properties[image_col] = html_images;
+            }
+            if(color_col){
+                properties['color'] = row[color_col];
+            }
 
+            // --- ROBUST MULTI-DATE ARRAY PARSING ---
+            row._dates = [];
+            if (year_start_col && typeof(row[year_start_col])!="undefined") {
+                var date_items = row[year_start_col]
+                if (typeof date_items === "string" || typeof date_items === "number") {
+                    date_items = [date_items]
+                }
+                var parsedYearsSet = new Set();
+                for (var j = 0; j < date_items.length; j++) {
+                    var parsedYear = this.parse_date_to_year(date_items[j]);
+                    if (parsedYear !== null) {
+                        parsedYearsSet.add(parsedYear);
+                    }
+                }
+                // Store unique sorted years into _dates
+                row._dates = Array.from(parsedYearsSet).sort((a, b) => a - b);
+            }
         }
     }
 
