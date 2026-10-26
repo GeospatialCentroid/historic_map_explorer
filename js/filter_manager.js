@@ -1425,16 +1425,20 @@ list_results(section_id = null) {
         if(item?.child_ids && item.child_ids.length==0 && item.type=="AllMaps"){
             html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+safe_title+'\',\''+item["Reference URL"]+'\',\''+item_id+'\',\''+item["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
         }
-        for (var i in item){
-            if ($.inArray(i,section.show_cols)!=-1 || DEBUGMODE){
-                var link = item[i]
-                if ((typeof link === 'string' || link instanceof String) && link.indexOf("http")==0){
-                   link="<a href='"+link+"' target='_blank'>"+link+"</a>"
+        var _show_cols =  section.show_cols
+        if (typeof DEBUGMODE !== 'undefined' && DEBUGMODE) {
+            _show_cols= Object.keys(item)
+        }
+            
+        for (var k = 0; k < _show_cols.length; k++) {
+            var col_name =_show_cols[k];
+            var link = item[col_name];
+
+            if (link !== undefined && link !== null && link !== "") {
+                if ((typeof link === 'string' || link instanceof String) && link.indexOf("http") == 0) {
+                    link = "<a href='" + link + "' target='_blank'>" + link + "</a>";
                 }
-                // only show if not blank
-                if(link!=""){
-                    html+="<div class='meta-item'><span class='fw-bold'>"+i+"</span> "+"<br/>"+link+"</div>"
-                }
+                html += "<div class='meta-item'><span class='fw-bold'>" + col_name + "</span><br/>" + link + "</div>";
             }
         }
         if(item?.[section.map_tiles_col]){
