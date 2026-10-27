@@ -540,3 +540,49 @@ async function download_item(URl, prefix = "") {
         document.body.removeChild(fallbackLink);
     }
 }
+
+// Intercept fetch requests to force HTTPS for cdm17204 IIIF endpoints
+(function() {
+  const originalFetch = window.fetch;
+  
+  window.fetch = async function(resource, init = {}) {
+    let url = typeof resource === 'string' ? resource : resource?.url;
+    
+    // If the request targets the cdm17204 domain via http, upgrade it to https
+    if (url && url.includes('http://cdm17204')) {
+      const secureUrl = url.replace('http://cdm17204', 'https://cdm17204');
+      
+      try {
+        // Forward the request with the upgraded URL and preserve all init options (like signals)
+        const response = await originalFetch(secureUrl, init);
+        
+        // If it's a JSON/text response (like info.json or manifest), rewrite internal @id values too
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('json') || secureUrl.includes('info.json') || secureUrl.includes('manifest')) {
+          const clonedResponse = response.clone();
+          try {
+            const text = await clonedResponse.text();
+            // Globally replace any remaining HTTP references in the JSON body
+            const secureText = text.replace(/http:\/\/cdm17204/g, 'https://cdm17204');
+            
+            return new Response(secureText, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers
+            });
+          } catch (err) {
+            console.warn('Could not rewrite JSON body, passing original response', err);
+            return response;
+          }
+        }
+        
+        return response;
+      } catch (error) {
+        console.error('Intercepted fetch failed for:', secureUrl, error);
+        throw error;
+      }
+    }
+    
+    return originalFetch(resource, init);
+  };
+})();
