@@ -496,17 +496,26 @@ class Filter_Manager {
                         text_search_active = true;
                         var raw_search_term = this.filters[a][0].toLowerCase();
                         
-                        // Normalize search term by stripping out literal quotes so "Un-Named Plat" becomes un-named plat
+                        // Normalize search term by stripping out literal quotes
                         var search_term = raw_search_term.replace(/["']/g, "").trim();
 
-                        // --- SCALABLE WEIGHT CONFIGURATION ---
+                        // --- FULLY SCALABLE DYNAMIC FIELD WEIGHTS ---
                         var field_weights = {};
-                        field_weights[section.title_col] = 1.0;       
-                        field_weights[section.description_col] = 0.5;  
+                        const configuredWeights = APP_CONFIG?.search?.field_weights || {};
+
+                        // Map configuration keys to the section's specific column names dynamically
+                        for (var weightKey in configuredWeights) {
+                            // e.g., if weightKey is 'title', check if section has a 'title_col' property
+                            var sectionColNameCol = section[weightKey + '_col']; 
+                            
+                            if (sectionColNameCol) {
+                                field_weights[sectionColNameCol] = configuredWeights[weightKey];
+                            }
+                        }
 
                         var matched_in_fields = false;
 
-                        // 1. Evaluate explicit field weights (normalize field values too)
+                        // 1. Evaluate explicit field weights dynamically
                         for (var col_key in field_weights) {
                             if (col_key && obj[col_key]) {
                                 var raw_field_val = String(obj[col_key]).toLowerCase();
@@ -521,7 +530,7 @@ class Filter_Manager {
 
                         // 2. Evaluate remaining row data
                         var raw_obj_str = JSON.stringify(omitKeys(obj, ['resource_obj', 'Reference URL'])).toLowerCase();
-                        var clean_obj_str = raw_obj_str.replace(/["']/g, ""); // Strip all quotes from the entire JSON blob
+                        var clean_obj_str = raw_obj_str.replace(/["']/g, ""); 
                         if (clean_obj_str.indexOf(search_term) !== -1) {
                             if (!matched_in_fields) {
                                 item_search_score += 0.25;
@@ -531,6 +540,7 @@ class Filter_Manager {
                                 meets_criteria = false;
                             }
                         }
+
                     }else if (a=='Bounds'){
                         var bounds_col = section.geojson_col;
                         if(obj?.[bounds_col]){
@@ -1429,7 +1439,7 @@ list_results(section_id = null) {
         if (typeof DEBUGMODE !== 'undefined' && DEBUGMODE) {
             _show_cols= Object.keys(item)
         }
-            
+        console.log("show details",item)
         for (var k = 0; k < _show_cols.length; k++) {
             var col_name =_show_cols[k];
             var link = item[col_name];

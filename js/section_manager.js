@@ -97,48 +97,66 @@ class Section_Manager {
         }
 
     }
-    parse_date_to_year(dateStr, mode = 'start') {
-        if (!dateStr) return null;
-        
-        // Convert to string and clean up
-        const str = String(dateStr).trim();
-        if (str === "") return null;
+   parse_date_to_year(dateStr, mode = 'start') {
+    if (dateStr === null || dateStr === undefined) return null;
+    
+    const str = String(dateStr).trim();
+    if (str === "") return null;
 
-        // Case 1: Already a 4-digit year (e.g., "1940")
-        if (/^\d{4}$/.test(str)) {
-            return parseInt(str, 10);
+    // GUARD: If the value is just a short string (like "5", "12", "3") 
+    // without delimiters or 4 digits, explicitly reject it so it doesn't default to 5.
+    if (/^\d{1,2}$/.test(str)) {
+        return null; 
+    }
+
+    // Case 1: Already a 4-digit year (e.g., "1940")
+    if (/^\d{4}$/.test(str)) {
+        return parseInt(str, 10);
+    }
+
+    // Case 2: Supports YYYY-MM or YYYY-MM-DD (e.g., "1940-05" or "1873-01-16")
+    const yearMonthMatch = str.match(/^(\d{4})-\d{1,2}/);
+    if (yearMonthMatch) {
+        const year = parseInt(yearMonthMatch[1], 10);
+        if (year > 1000 && year < 2100) return year;
+    }
+
+    // Case 3: Supports slash-separated short dates like "5/8/84" or "12/31/99"
+    const slashDateMatch = str.match(/^\d{1,2}\/\d{1,2}\/(\d{2,4})$/);
+    if (slashDateMatch) {
+        const yearPart = slashDateMatch[1];
+        if (yearPart.length === 4) {
+            const year = parseInt(yearPart, 10);
+            if (year > 1000 && year < 2100) return year;
+        } else if (yearPart.length === 2) {
+            const num = parseInt(yearPart, 10);
+            return num > 30 ? 1900 + num : 2000 + num;
         }
+    }
 
-        // Case 2: Supports YYYY-MM or YYYY-MM-DD (e.g., "1940-05" or "1873-01-16")
-        // Checks if the string starts with 4 digits followed by a hyphen
-        const yearMonthMatch = str.match(/^(\d{4})-\d{1,2}/);
-        if (yearMonthMatch) {
-            const year = parseInt(yearMonthMatch[1], 10);
+    // Case 4: Contains general hyphens or slashes, extract 4-digit or 2-digit years
+    const matches = str.match(/\d+/g);
+    if (!matches) return null;
+
+    // Look for a 4-digit year anywhere in the string
+    for (let part of matches) {
+        if (part.length === 4) {
+            const year = parseInt(part, 10);
             if (year > 1000 && year < 2100) return year;
         }
+    }
 
-        // Case 3: Contains general hyphens or slashes, extract 4-digit or 2-digit years
-        const matches = str.match(/\d+/g);
-        if (!matches) return null;
-
-        // Look for a 4-digit year anywhere in the string
-        for (let part of matches) {
-            if (part.length === 4) {
-                const year = parseInt(part, 10);
-                if (year > 1000 && year < 2100) return year;
-            }
-        }
-
-        // Handle 2-digit years (e.g., "1/1/78" -> 1978 or 2078)
+    // Handle 2-digit years ONLY if there are multiple parts (e.g., "1/1/78")
+    if (matches.length > 1) {
         for (let part of matches) {
             if (part.length === 2) {
                 const num = parseInt(part, 10);
                 return num > 30 ? 1900 + num : 2000 + num;
             }
         }
-
-        return null;
     }
+    return null;
+}
     setup_disclaimer(_data,_id){
         $('#disclaimer_heading').html(_data.name);
         $('#disclaimer_text').html(_data.disclaimer);
@@ -511,17 +529,28 @@ class Section_Manager {
             var row = all_data[i];
             var properties = {};
 
-            for (var k=0; k < separated_cols.length; k++){
-                // if there is a number clean it up
-                if(row?.[separated_cols[k]] ){
-                    if (row[separated_cols[k]]?.match(/\d/) == null){
-                        row[separated_cols[k]] = row[separated_cols[k]]
-                            .split(",")
-                            .map(s => s.trim());
+           for (var k = 0; k < separated_cols.length; k++) {
+                var colName = separated_cols[k];
+                
+                // Check if the column name has 'date' in it
+                var isDateCol = colName && colName.toLowerCase().includes("date");
+
+                if (row?.[colName]) {
+                    var valStr = String(row[colName]);
+                    
+                    // Split on either comma or semicolon
+                    var parts = valStr.split(/[,;]/).map(s => s.trim());
+
+                    if (isDateCol) {
+                        // Keep date columns as pristine strings/arrays of strings
+                        row[colName] = parts;
                     } else {
-                        // contentdm uses semicolon for date lists
-                        row[separated_cols[k]] = row[separated_cols[k]].split(";").map(function(item) {
-                            return getValidNumber(item.trim());
+                        // For non-date columns, clean up numbers using getValidNumber if applicable
+                        row[colName] = parts.map(function(item) {
+                            if (item.match(/\d/) !== null) {
+                                return getValidNumber(item);
+                            }
+                            return item;
                         });
                     }
                 }
