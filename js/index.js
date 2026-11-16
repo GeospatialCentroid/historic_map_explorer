@@ -576,6 +576,7 @@ function toggleGaTracking() {
     window[disableStr] = true;
   }
   
+  updateButtonText();
 
 }
 

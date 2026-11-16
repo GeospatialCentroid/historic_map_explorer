@@ -1140,7 +1140,7 @@ list_results(section_id = null) {
          text = LANG.RESULT.VIEW
          var iiif_url = item["IIIF"];
          var func ="image_manager.show_image"
-         var title = item[section.title_col].replace(/"/g, '&quot;'); 
+         var title = this.get_safe_title(item[section.title_col]); 
          var ref_url = item["Reference URL"]
          button_text = `<button type="button" class="btn ${_class} view_but" onclick="${func}(\`${iiif_url}\`, \`${title}\`, \`${ref_url}\`, \`${item_id}\`, \`${item.georeference || ''}\`)">${text}</button>`
         }
@@ -1321,11 +1321,11 @@ list_results(section_id = null) {
             }
             html+='<button type="button" class="btn btn-success" onclick="filter_manager.select_item('+section_id+',\''+item.child_ids[i]+'\',true);" >Details</button>'
             html+="</div>";
-            html+='<div class="item_thumb_container"><img class="item_thumb" src="'+thumb_url+'"></div>'
+            html+='<div class="item_thumb_container"><img class="item_thumb" src="'+thumb_url+'" alt="'+item[section.description_col]+'"></div>'
             if (child.type=="AllMaps" || (child.type=="image" &&  child.geojson!="")){
 
-                var safe_title = child[section.title_col].replace(/"/g, '&quot;');
-                html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+safe_title+'\',\''+child["Reference URL"]+'\',\''+child["id"]+'\',\''+child["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
+                var title = this.get_safe_text(child[section.title_col]);
+                html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+title+'\',\''+child["Reference URL"]+'\',\''+child["id"]+'\',\''+child["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
 
             }
 
@@ -1408,7 +1408,13 @@ list_results(section_id = null) {
          this.display_resource_id = section_id+"_"+item_id;
          save_params()
     }
-
+    get_safe_text(title){
+         var safe_title = title
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, '\\x27')
+                .replace(/"/g, '&quot;');
+        return safe_title;
+    }
     show_details(item,section,_elm){
         // @param match: a json object with details (including a page path to load 'path_col')
         //create html details to show
@@ -1420,7 +1426,8 @@ list_results(section_id = null) {
         var thumb_url=item[section.image_col]
         item[section.title_col]
         var iiif_url = item["IIIF"];
-        var safe_title = item[section.title_col].replace(/"/g, '&quot;');
+
+        var title = this.get_safe_text(item[section.title_col])
 
         var html=''
         html+='<div class="item_title">'+item[section.title_col]+"</div>";// add the title column
@@ -1430,10 +1437,10 @@ list_results(section_id = null) {
           }
         html+='<button type="button" class="btn btn-primary"  data-record-id="\''+record_id+'\'" title="Copy Permalink" onclick="copy_record_permalink(\''+record_id+'\')"><i class="bi bi-link"></i></button>'
         html+="</div>"
-        html+='<div class="item_thumb_container"><img class="item_thumb" src="'+thumb_url+'"></div>';
+        html+='<div class="item_thumb_container"><img class="item_thumb" src="'+thumb_url+'" alt="'+item[section.description_col]+'"></div>';
 
         if(item?.child_ids && item.child_ids.length==0 && item.type=="AllMaps"){
-            html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+safe_title+'\',\''+item["Reference URL"]+'\',\''+item_id+'\',\''+item["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
+            html+='<a href="javascript:void(0);" onclick="image_manager.show_image(\''+iiif_url+'\',\''+title+'\',\''+item["Reference URL"]+'\',\''+item_id+'\',\''+item["georeference"]+'\');">'+LANG.DETAILS.IMAGE_VIEW+'</a>'+"<br/>";
         }
         var _show_cols =  section.show_cols
         if (typeof DEBUGMODE !== 'undefined' && DEBUGMODE) {
