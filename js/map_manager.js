@@ -51,7 +51,7 @@ class Map_Manager {
         var html=`<button type="button" id="" class="btn btn-primary compressed" onclick="filter_manager.handle_point_search(${e.latlng.lat},${e.latlng.lng});">${text}</button>`
 
 
-        $this.popup= L.popup($this.popup_options)
+        $this.popup= L.popup(window.innerWidth < 768 ? Object.assign({}, $this.popup_options, { autoPan: false }) : $this.popup_options)
         .setLatLng(e.latlng)
         .setContent(html)
         .openOn($this.map)
@@ -228,6 +228,12 @@ class Map_Manager {
     var html = '';
     var $this=this
     var id = null
+    // On mobile the sidebar is stacked vertically, not beside the map, so the 260px
+    // autoPanPadding that keeps popups clear of the desktop sidebar causes the map to
+    // pan wildly on narrow screens. Disable autoPan entirely below 768px.
+    var opts = window.innerWidth < 768
+        ? Object.assign({}, this.popup_options, { autoPan: false })
+        : this.popup_options;
     if(!item){
         var html = '<div id="popup_content"><div class="spinner_wrapper" style="text-align:center"><div class="spinner-border spinner-border-sm" role="status"></div></div></div>'
 
@@ -249,7 +255,7 @@ class Map_Manager {
         }
         var html = layer_manager.get_layer_html(section_id,item_id,_class,extra,"_popup")
     }
-    this.popup= L.popup(this.popup_options)
+    this.popup= L.popup(opts)
         .setLatLng(this.click_lat_lng)
         .setContent(html)
         .openOn(this.map)

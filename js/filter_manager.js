@@ -1394,6 +1394,14 @@ list_results(section_id = null) {
          var item= this.get_item(section_id,item_id)
          var section=section_manager.get_section_details(section_id)
         
+        // If the sidebar was collapsed (e.g. user closed it on mobile), open it first
+        // so the details panel is actually visible.
+        var sidebar = document.getElementById('side_bar');
+        if (sidebar && sidebar.classList.contains('collapsed')) {
+            sidebar.classList.remove('collapsed');
+            update_side_bar_icon();
+        }
+        
         // allow for parent level records
         // and child level records
         // todo - in the case of child records, we should populate the parent and layers panels
