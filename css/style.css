@@ -458,14 +458,14 @@ a.disabled {
     margin-bottom: 10px;
 }
 .item_thumb {
-
     display: inline-block;
     margin: 5px;
-    width:200px;
-    height:auto;
+    width: 150px;
+    max-height: 150px;
+    height: auto;
+    object-fit: contain;
     border: 1px solid #ddd;
     border-radius: 4px;
-
 }
 
 .item_thumb img{

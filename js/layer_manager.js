@@ -812,9 +812,11 @@ class Layer_Manager {
     try{
         layer_obj.on('click', function (e) {
             console.log(e,resource)
-
+          try{
            $this.layer_click(e,resource.section_id+"_"+resource._id);
-
+           }catch(e){
+                console_log(e)
+            }
         });
     }catch(e){
         console_log(e)
@@ -1227,6 +1229,23 @@ class Layer_Manager {
         section.clustered_points.on('clusterclick', function (a) {
           a.layer.spiderfy();
         });
+
+        section.clustered_points.on('spiderfied', function (e) {
+            // e.markers is the array of Leaflet markers that were just spread out.
+            // Give each one a tabindex so it enters the tab order, then focus the first.
+            var icons = e.markers.map(function (m) { return m.getElement(); }).filter(Boolean);
+            icons.forEach(function (el) { el.setAttribute('tabindex', '0'); });
+            if (icons[0]) { icons[0].focus(); }
+        });
+
+        section.clustered_points.on('unspiderfied', function (e) {
+            // Remove tabindex so hidden markers don't sit in the tab order.
+            e.markers.forEach(function (m) {
+                var el = m.getElement();
+                if (el) { el.removeAttribute('tabindex'); }
+            });
+        });
+
         layer_obj.addLayer(section.clustered_points);
     }
 

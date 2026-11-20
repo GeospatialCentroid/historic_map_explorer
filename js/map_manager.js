@@ -256,6 +256,21 @@ class Map_Manager {
         .on("remove", function () {
             $this.show_highlight_geo_json()
             });
+    if(id){
+        this.map.once("popupopen", function () {
+            // autoPan may animate the map after popupopen fires, stealing focus.
+            // Wait for the pan to finish before focusing.
+            $this.map.once("moveend", function () {
+                var toggleBtn = document.getElementById(id + "_toggle");
+                if (toggleBtn) { toggleBtn.focus(); }
+            });
+            // If the map doesn't need to pan, moveend won't fire — fall back with a short delay.
+            setTimeout(function () {
+                var toggleBtn = document.getElementById(id + "_toggle");
+                if (toggleBtn && !toggleBtn.matches(":focus")) { toggleBtn.focus(); }
+            }, 50);
+        });
+    }
     if(item){
         // add active class if the layer is visible  
         // create and set slider values

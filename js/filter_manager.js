@@ -1140,7 +1140,7 @@ list_results(section_id = null) {
          text = LANG.RESULT.VIEW
          var iiif_url = item["IIIF"];
          var func ="image_manager.show_image"
-         var title = this.get_safe_title(item[section.title_col]); 
+         var title = this.get_safe_text(item[section.title_col]); 
          var ref_url = item["Reference URL"]
          button_text = `<button type="button" class="btn ${_class} view_but" onclick="${func}(\`${iiif_url}\`, \`${title}\`, \`${ref_url}\`, \`${item_id}\`, \`${item.georeference || ''}\`)">${text}</button>`
         }
